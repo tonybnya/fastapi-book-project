@@ -1,6 +1,6 @@
-from typing import OrderedDict
+from typing import Optional, OrderedDict
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from api.db.schemas import Book, Genre, InMemoryDB
@@ -46,6 +46,33 @@ async def create_book(book: Book):
 )
 async def get_books() -> OrderedDict[int, Book]:
     return db.get_books()
+
+
+# TODO: Implement the missing endpoint
+@router.get("/{book_id}", response_model=Book, status_code=status.HTTP_200_OK)
+async def get_book(book_id: int) -> Book:
+    """Get a single book by its ID.
+    Endpoint GET /api/v1/books/{book_id}
+    """
+    # treat invalid integers (ID less than or equal to 0)
+    if book_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
+
+    book: Optional[Book] = db.get_book(book_id)
+
+    if book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=book.model_dump()
+    )
 
 
 @router.put("/{book_id}", response_model=Book, status_code=status.HTTP_200_OK)
