@@ -8,40 +8,45 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    needs: []  # If you want this to run after tests, add 'test' here
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Linode CLI
+      - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
           pip install linode-cli
 
-      - name: Login to Linode CLI
+      - name: Configure Linode CLI
         env:
           LINODE_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
         run: |
-          echo "$LINODE_TOKEN" > ~/.linode-cli
+          mkdir -p ~/.config/linode-cli
+          echo -e "[DEFAULT]\ntoken = ${LINODE_TOKEN}" > ~/.config/linode-cli/config
 
       - name: Deploy to Linode
         env:
-          LINODE_INSTANCE_ID: ${{ secrets.LINODE_INSTANCE_ID }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          LINODE_IP: ${{ secrets.LINODE_IP }}
         run: |
           # Write the SSH key to a file
           echo "$SSH_PRIVATE_KEY" > deploy_key
           chmod 600 deploy_key
           
           # Deploy using SSH
-          ssh -i deploy_key -o StrictHostKeyChecking=no root@$(linode-cli linodes list --json | jq -r ".[0].ipv4[0]") "
+          ssh -i deploy_key -o StrictHostKeyChecking=no root@${LINODE_IP} "
             cd /var/www/fastapi-app && \
-            git pull origin main && \
+            git fetch origin main && \
+            git reset --hard origin/main && \
             docker-compose down && \
             docker-compose up -d --build
           "
 
       - name: Verify Deployment
+        env:
+          LINODE_IP: ${{ secrets.LINODE_IP }}
         run: |
-          sleep 30  # Wait for services to start
-          curl -f http://$(linode-cli linodes list --json | jq -r ".[0].ipv4[0]")
+          sleep 45  # Increased wait time for services to start
+          curl -f http://${LINODE_IP}/healthcheck || exit 1
