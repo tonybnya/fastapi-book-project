@@ -13,30 +13,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install the dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq openssh-client
           pip install linode-cli
 
-      - name: Configure Linode CLI
+      - name: Setup SSH
         env:
-          LINODE_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.config/linode-cli
-          echo -e "[DEFAULT]\ntoken = ${LINODE_TOKEN}" > ~/.config/linode-cli/config
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
 
       - name: Deploy to Linode
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           LINODE_IP: ${{ secrets.LINODE_IP }}
         run: |
-          # Write the SSH key to a file
-          echo "$SSH_PRIVATE_KEY" > deploy_key
-          chmod 600 deploy_key
-          
-          # Deploy using SSH
-          ssh -i deploy_key -o StrictHostKeyChecking=no root@${LINODE_IP} "
+          ssh root@${LINODE_IP} "
             cd /var/www/fastapi-app && \
             git fetch origin main && \
             git reset --hard origin/main && \
@@ -48,5 +48,5 @@ jobs:
         env:
           LINODE_IP: ${{ secrets.LINODE_IP }}
         run: |
-          sleep 45  # Increased wait time for services to start
+          sleep 45
           curl -f http://${LINODE_IP}/healthcheck || exit 1
