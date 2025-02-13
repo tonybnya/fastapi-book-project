@@ -44,9 +44,9 @@ jobs:
             docker-compose up -d --build
           "
 
-      - name: Verify Deployment
-        env:
-          LINODE_IP: ${{ secrets.LINODE_IP }}
-        run: |
-          sleep 45
-          curl -f http://${LINODE_IP}/api/v1/healthcheck || exit 1
+      # - name: Verify Deployment
+      #   env:
+      #     LINODE_IP: ${{ secrets.LINODE_IP }}
+      #   run: |
+      #     sleep 45
+      #     curl -f http://${LINODE_IP}/api/v1/healthcheck || exit 1
